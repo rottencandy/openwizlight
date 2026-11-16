@@ -12,7 +12,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
@@ -56,8 +63,12 @@ fun DeviceListScreen(
             TopAppBar(
                 title = { Text("OpenWiZLight") },
                 actions = {
-                    TextButton(onClick = { editingKey = true }) { Text("Key") }
-                    TextButton(onClick = onScan, enabled = !state.scanning) { Text("Scan") }
+                    IconButton(onClick = { editingKey = true }) {
+                        Icon(Icons.Outlined.Key, contentDescription = "Signing key")
+                    }
+                    IconButton(onClick = onScan, enabled = !state.scanning) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Scan")
+                    }
                 },
             )
         },
@@ -82,7 +93,16 @@ fun DeviceListScreen(
 
 @Composable
 private fun DeviceRow(device: WizDevice, onClick: () -> Unit) {
+    val on = device.pilot?.on == true
     ListItem(
+        leadingContent = {
+            // A lit (filled, accent-coloured) bulb for lights that are on.
+            Icon(
+                imageVector = if (on) Icons.Filled.Lightbulb else Icons.Outlined.Lightbulb,
+                contentDescription = null,
+                tint = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
         headlineContent = { Text(device.displayName()) },
         supportingContent = { Text(stateSummary(device)) },
         modifier = Modifier.clickable(onClick = onClick),

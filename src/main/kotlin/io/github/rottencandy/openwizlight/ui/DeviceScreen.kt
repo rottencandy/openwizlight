@@ -2,13 +2,19 @@ package io.github.rottencandy.openwizlight.ui
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -22,9 +28,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 import io.github.rottencandy.openwizlight.wiz.MAX_DIMMING
 import io.github.rottencandy.openwizlight.wiz.MIN_DIMMING
@@ -48,7 +51,7 @@ fun DeviceScreen(
             TopAppBar(
                 title = { Text(device.displayName()) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(BackArrow, contentDescription = "Back") }
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
                 },
             )
         },
@@ -61,17 +64,7 @@ fun DeviceScreen(
         ) {
             error?.let { StatusText(it, isError = true) }
 
-            SectionHeader("Controls")
-            val pilot = device.pilot
-            if (pilot == null) {
-                StatusText("State unavailable; the device didn't answer")
-            } else {
-                ListItem(
-                    headlineContent = { Text("Power") },
-                    trailingContent = { Switch(checked = pilot.on, onCheckedChange = onPowerChange) },
-                )
-                pilot.dimming?.let { BrightnessSlider(it, onBrightnessChange) }
-            }
+            ControlsCard(device, onPowerChange, onBrightnessChange)
 
             SectionHeader("Device")
             InfoRow("Model", device.moduleName)
@@ -82,6 +75,32 @@ fun DeviceScreen(
                 .filterKeys { it !in SHOWN_CONFIG_FIELDS }
                 .toSortedMap()
                 .forEach { (name, value) -> InfoRow(name, value) }
+        }
+    }
+}
+
+/** Groups the interactive controls on a filled card, setting them apart from the info list. */
+@Composable
+private fun ControlsCard(
+    device: WizDevice,
+    onPowerChange: (Boolean) -> Unit,
+    onBrightnessChange: (Int) -> Unit,
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp),
+    ) {
+        val pilot = device.pilot
+        if (pilot == null) {
+            StatusText("State unavailable; the device didn't answer")
+        } else {
+            ListItem(
+                headlineContent = { Text("Power") },
+                trailingContent = { Switch(checked = pilot.on, onCheckedChange = onPowerChange) },
+                // Let the card's colour show through instead of the list item's surface.
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            )
+            pilot.dimming?.let { BrightnessSlider(it, onBrightnessChange) }
         }
     }
 }
@@ -123,20 +142,3 @@ private fun InfoRow(label: String, value: String?) {
         headlineContent = { Text(value) },
     )
 }
-
-/** Material "arrow_back", inlined to avoid depending on the icons library for one icon. */
-private val BackArrow: ImageVector =
-    ImageVector.Builder("Back", 24.dp, 24.dp, 24f, 24f, autoMirror = true)
-        .path(fill = SolidColor(Color.Black)) {
-            moveTo(20f, 11f)
-            horizontalLineTo(7.83f)
-            lineToRelative(5.59f, -5.59f)
-            lineTo(12f, 4f)
-            lineToRelative(-8f, 8f)
-            lineToRelative(8f, 8f)
-            lineToRelative(1.41f, -1.41f)
-            lineTo(7.83f, 13f)
-            horizontalLineTo(20f)
-            close()
-        }
-        .build()
