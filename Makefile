@@ -1,4 +1,5 @@
 APK := build/outputs/apk/debug/OpenWiZLight-debug.apk
+RELEASE_DIR := build/outputs/apk/release
 APP_ID := io.github.rottencandy.openwizlight
 
 # Run commands inside the flake's dev shell unless already in one.
@@ -8,13 +9,17 @@ else
 	NIX := nix develop --command
 endif
 
-.PHONY: help build install run clean
+.PHONY: help build release install run clean
 
 help: ## Show available targets
 	@grep -E '^[a-z]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
 
 build: ## Build the debug APK
 	$(NIX) gradle assembleDebug
+
+release: ## Build the shrunk release APK, signed if keystore.properties exists
+	$(NIX) gradle assembleRelease
+	@ls $(RELEASE_DIR)/*.apk
 
 install: build ## Build and install the debug APK on a connected device
 	$(NIX) adb install -r $(APK)
