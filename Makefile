@@ -1,5 +1,5 @@
-APK := build/outputs/apk/debug/hello-debug.apk
-APP_ID := com.example.hello
+APK := build/outputs/apk/debug/OpenWiZLight-debug.apk
+APP_ID := io.github.rottencandy.openwizlight
 
 # Run commands inside the flake's dev shell unless already in one.
 ifdef IN_NIX_SHELL

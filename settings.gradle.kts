@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "hello"
+rootProject.name = "OpenWiZLight"
