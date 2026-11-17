@@ -11,7 +11,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
 import io.github.rottencandy.openwizlight.ui.DeviceListScreen
 import io.github.rottencandy.openwizlight.ui.DeviceListViewModel
 import io.github.rottencandy.openwizlight.ui.DeviceScreen
@@ -24,6 +28,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Push updates only while visible; stopping lets device registrations lapse.
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.receivePushUpdates() }
+        }
         setContent {
             OpenWizLightTheme {
                 val state by viewModel.state.collectAsStateWithLifecycle()

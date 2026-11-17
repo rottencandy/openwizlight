@@ -21,6 +21,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import io.github.rottencandy.openwizlight.wiz.WizPush
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONException
@@ -143,6 +149,48 @@ class DeviceListViewModel(application: Application) : AndroidViewModel(applicati
 
     fun setSpeed(device: WizDevice, speed: Int) =
         control(device, { it.copy(speed = speed) }) { key -> WizClient.setSpeed(device.ip, speed, key) }
+
+    /**
+     * Keeps every listed device registered for push updates and applies the states they push,
+     * until cancelled. Meant to run only while the app is visible, since registration traffic
+     * every [WizPush.KEEP_ALIVE_MS] isn't worth it in the background. If the push port can't be
+     * opened, returns quietly and states only update on refresh, as before.
+     */
+    suspend fun receivePushUpdates() {
+        try {
+            coroutineScope {
+                launch { keepRegistered() }
+                WizPush.updates().collect { (mac, pilot) ->
+                    _state.update { it.updateDevice(mac) { d -> d.copy(pilot = pilot) } }
+                }
+            }
+        } catch (_: IOException) {
+            // Port in use or network unavailable; push is best-effort.
+        }
+    }
+
+    /**
+     * Registers all listed devices now and then every keep-alive interval. A changed device
+     * list (e.g. a new scan result) registers the new set right away.
+     */
+    private suspend fun keepRegistered() {
+        _state.map { s -> s.devices.map { it.ip } }.distinctUntilChanged().collectLatest { ips ->
+            while (true) {
+                coroutineScope {
+                    ips.forEach { ip ->
+                        launch {
+                            try {
+                                WizPush.register(ip, currentKey())
+                            } catch (_: IOException) {
+                                // Retried on the next round.
+                            }
+                        }
+                    }
+                }
+                delay(WizPush.KEEP_ALIVE_MS)
+            }
+        }
+    }
 
     private fun currentKey(): ByteArray? = _state.value.signingKey?.let(::decodeSigningKey)
 

@@ -143,19 +143,20 @@ object WizClient {
             if (e.code == WizErrorException.METHOD_NOT_FOUND) null else throw e
         }
 
-    private fun parsePilot(result: JSONObject): WizPilot =
-        WizPilot(
-            on = result.optBoolean("state"),
-            dimming = result.takeIf { it.has("dimming") }?.optInt("dimming"),
-            temp = result.optInt("temp").takeIf { it > 0 },
-            color = listOf("r", "g", "b").takeIf { keys -> keys.all(result::has) }?.let {
-                rgbCwToHs(result.optInt("r"), result.optInt("g"), result.optInt("b"), result.optInt("w"))
-            },
-            // Like pywizlight, a Rhythm schedule takes precedence; sceneId 0 means no scene.
-            scene = if (result.has("schdPsetId")) RHYTHM_SCENE_ID else result.optInt("sceneId").takeIf { it > 0 },
-            speed = result.takeIf { it.has("speed") }?.optInt("speed"),
-        )
-
     private fun backoffIntervals(): Sequence<Long> =
         generateSequence(FIRST_SEND_INTERVAL_MS) { minOf(it * 2, MAX_BACKOFF_MS) }.take(MAX_SENDS)
 }
+
+/** Parses light state from a `getPilot` result or `syncPilot` params, which share a format. */
+internal fun parsePilot(result: JSONObject): WizPilot =
+    WizPilot(
+        on = result.optBoolean("state"),
+        dimming = result.takeIf { it.has("dimming") }?.optInt("dimming"),
+        temp = result.optInt("temp").takeIf { it > 0 },
+        color = listOf("r", "g", "b").takeIf { keys -> keys.all(result::has) }?.let {
+            rgbCwToHs(result.optInt("r"), result.optInt("g"), result.optInt("b"), result.optInt("w"))
+        },
+        // Like pywizlight, a Rhythm schedule takes precedence; sceneId 0 means no scene.
+        scene = if (result.has("schdPsetId")) RHYTHM_SCENE_ID else result.optInt("sceneId").takeIf { it > 0 },
+        speed = result.takeIf { it.has("speed") }?.optInt("speed"),
+    )
