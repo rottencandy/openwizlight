@@ -15,6 +15,9 @@ class WizErrorException(ip: String, method: String, error: JSONObject) :
     val code: Int = error.optInt("code")
 
     companion object {
+        /** The firmware doesn't implement the method, e.g. `getModelConfig` before 1.22. */
+        const val METHOD_NOT_FOUND = -32601
+
         /** Unsigned write to firmware that requires signing. */
         const val INVALID_PARAMS = -32602
 
@@ -69,11 +72,42 @@ object WizClient {
         request(ip, "setPilot", JSONObject().put("state", on), signingKey)
     }
 
-    /** Sets brightness in percent; like pywizlight's `turn_on`, this also switches the light on. */
-    suspend fun setBrightness(ip: String, percent: Int, signingKey: ByteArray? = null) {
-        val dimming = percent.coerceIn(MIN_DIMMING, MAX_DIMMING)
+    /**
+     * Sets brightness in percent, raised to at least [minDimming]; like pywizlight's `turn_on`,
+     * this also switches the light on.
+     */
+    suspend fun setBrightness(
+        ip: String,
+        percent: Int,
+        minDimming: Int = MIN_DIMMING,
+        signingKey: ByteArray? = null,
+    ) {
+        val dimming = percent.coerceIn(minDimming, MAX_DIMMING)
         request(ip, "setPilot", JSONObject().put("state", true).put("dimming", dimming), signingKey)
     }
+
+    /**
+     * Detects what the device supports, given its `getSystemConfig` reply. Queries
+     * `getModelConfig`, falling back to `getUserConfig` on firmware older than 1.22.
+     * Returns null if the device can't be identified.
+     */
+    suspend fun getCapabilities(
+        ip: String,
+        systemConfig: JSONObject,
+        signingKey: ByteArray? = null,
+    ): WizCapabilities? {
+        val modelConfig = requestOrNullIfUnsupported(ip, "getModelConfig", signingKey)
+        val userConfig = if (modelConfig == null) request(ip, "getUserConfig", signingKey = signingKey) else null
+        return detectCapabilities(systemConfig, modelConfig, userConfig)
+    }
+
+    /** Like [request], but returns null if the firmware doesn't implement [method]. */
+    private suspend fun requestOrNullIfUnsupported(ip: String, method: String, signingKey: ByteArray?): JSONObject? =
+        try {
+            request(ip, method, signingKey = signingKey)
+        } catch (e: WizErrorException) {
+            if (e.code == WizErrorException.METHOD_NOT_FOUND) null else throw e
+        }
 
     private fun parsePilot(result: JSONObject): WizPilot =
         WizPilot(

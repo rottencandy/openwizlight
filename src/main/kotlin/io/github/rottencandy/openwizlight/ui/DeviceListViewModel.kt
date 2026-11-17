@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.rottencandy.openwizlight.wiz.MIN_DIMMING
 import io.github.rottencandy.openwizlight.wiz.WizClient
 import io.github.rottencandy.openwizlight.wiz.WizDevice
 import io.github.rottencandy.openwizlight.wiz.WizDiscovery
@@ -117,7 +118,8 @@ class DeviceListViewModel(application: Application) : AndroidViewModel(applicati
 
     fun setBrightness(device: WizDevice, percent: Int) =
         control(device, { it.copy(on = true, dimming = percent) }) { key ->
-            WizClient.setBrightness(device.ip, percent, key)
+            val minDimming = device.capabilities?.minDimming ?: MIN_DIMMING
+            WizClient.setBrightness(device.ip, percent, minDimming, key)
         }
 
     private fun currentKey(): ByteArray? = _state.value.signingKey?.let(::decodeSigningKey)
@@ -146,7 +148,10 @@ class DeviceListViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    /** Fills in model and firmware details; the device stays listed without them on failure. */
+    /**
+     * Fills in model and firmware details, then detects capabilities; the device stays listed
+     * without whatever couldn't be fetched.
+     */
     private suspend fun fetchSystemConfig(device: WizDevice) {
         try {
             val config = WizClient.request(device.ip, "getSystemConfig", signingKey = currentKey())
@@ -160,8 +165,10 @@ class DeviceListViewModel(application: Application) : AndroidViewModel(applicati
                     )
                 }
             }
+            val capabilities = WizClient.getCapabilities(device.ip, config, currentKey())
+            _state.update { it.updateDevice(device.mac) { d -> d.copy(capabilities = capabilities) } }
         } catch (_: IOException) {
-            // Device answered discovery but not the config query; keep the basic entry.
+            // Device answered discovery but not a config query; keep what was fetched.
         }
     }
 
