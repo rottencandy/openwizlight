@@ -87,6 +87,40 @@ object WizClient {
     }
 
     /**
+     * Sets the white colour temperature in Kelvin, switching the light on and out of any
+     * colour or scene. [kelvin] is clamped to [range], defaulting to pywizlight's 1000–10000 K.
+     */
+    suspend fun setColorTemp(
+        ip: String,
+        kelvin: Int,
+        range: KelvinRange = KelvinRange(MIN_KELVIN, MAX_KELVIN),
+        signingKey: ByteArray? = null,
+    ) {
+        val temp = kelvin.coerceIn(range.min, range.max)
+        request(ip, "setPilot", JSONObject().put("state", true).put("temp", temp), signingKey)
+    }
+
+    /**
+     * Shows [color], switching the light on and out of white mode or any scene. Sent as r/g/b
+     * plus warm white, as pywizlight's `hs2rgbcw` computes.
+     */
+    suspend fun setColor(ip: String, color: HueSat, signingKey: ByteArray? = null) {
+        val (r, g, b, w) = hsToRgbCw(color)
+        val params = JSONObject().put("state", true).put("r", r).put("g", g).put("b", b).put("w", w)
+        request(ip, "setPilot", params, signingKey)
+    }
+
+    /** Starts the scene [sceneId] (see [SCENE_NAMES]), switching the light on. */
+    suspend fun setScene(ip: String, sceneId: Int, signingKey: ByteArray? = null) {
+        request(ip, "setPilot", JSONObject().put("state", true).put("sceneId", sceneId), signingKey)
+    }
+
+    /** Sets how fast the running scene changes, clamped to [MIN_SPEED]–[MAX_SPEED]. */
+    suspend fun setSpeed(ip: String, speed: Int, signingKey: ByteArray? = null) {
+        request(ip, "setPilot", JSONObject().put("speed", speed.coerceIn(MIN_SPEED, MAX_SPEED)), signingKey)
+    }
+
+    /**
      * Detects what the device supports, given its `getSystemConfig` reply. Queries
      * `getModelConfig`, falling back to `getUserConfig` on firmware older than 1.22.
      * Returns null if the device can't be identified.
@@ -113,6 +147,13 @@ object WizClient {
         WizPilot(
             on = result.optBoolean("state"),
             dimming = result.takeIf { it.has("dimming") }?.optInt("dimming"),
+            temp = result.optInt("temp").takeIf { it > 0 },
+            color = listOf("r", "g", "b").takeIf { keys -> keys.all(result::has) }?.let {
+                rgbCwToHs(result.optInt("r"), result.optInt("g"), result.optInt("b"), result.optInt("w"))
+            },
+            // Like pywizlight, a Rhythm schedule takes precedence; sceneId 0 means no scene.
+            scene = if (result.has("schdPsetId")) RHYTHM_SCENE_ID else result.optInt("sceneId").takeIf { it > 0 },
+            speed = result.takeIf { it.has("speed") }?.optInt("speed"),
         )
 
     private fun backoffIntervals(): Sequence<Long> =

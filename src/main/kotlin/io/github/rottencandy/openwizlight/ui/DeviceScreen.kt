@@ -1,6 +1,23 @@
 package io.github.rottencandy.openwizlight.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.runtime.mutableIntStateOf
+import io.github.rottencandy.openwizlight.wiz.HueSat
+import io.github.rottencandy.openwizlight.wiz.MAX_SPEED
+import io.github.rottencandy.openwizlight.wiz.MIN_SPEED
+import io.github.rottencandy.openwizlight.wiz.SCENE_NAMES
+import io.github.rottencandy.openwizlight.wiz.scenesFor
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -50,6 +67,10 @@ fun DeviceScreen(
     onBack: () -> Unit,
     onPowerChange: (Boolean) -> Unit,
     onBrightnessChange: (Int) -> Unit,
+    onColorTempChange: (Int) -> Unit,
+    onColorChange: (HueSat) -> Unit,
+    onSceneChange: (Int) -> Unit,
+    onSpeedChange: (Int) -> Unit,
 ) {
     var showDetails by rememberSaveable { mutableStateOf(false) }
 
@@ -76,7 +97,15 @@ fun DeviceScreen(
         ) {
             error?.let { StatusText(it, isError = true) }
 
-            ControlsCard(device, onPowerChange, onBrightnessChange)
+            ControlsCard(
+                device,
+                onPowerChange,
+                onBrightnessChange,
+                onColorTempChange,
+                onColorChange,
+                onSceneChange,
+                onSpeedChange,
+            )
         }
     }
 
@@ -116,6 +145,10 @@ private fun ControlsCard(
     device: WizDevice,
     onPowerChange: (Boolean) -> Unit,
     onBrightnessChange: (Int) -> Unit,
+    onColorTempChange: (Int) -> Unit,
+    onColorChange: (HueSat) -> Unit,
+    onSceneChange: (Int) -> Unit,
+    onSpeedChange: (Int) -> Unit,
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -133,11 +166,113 @@ private fun ControlsCard(
             )
             val caps = device.capabilities
             if (caps?.deviceClass?.brightness != false) {
-                pilot.dimming?.let { BrightnessSlider(it, caps?.minDimming ?: MIN_DIMMING, onBrightnessChange) }
+                pilot.dimming?.let { dimming ->
+                    ControlSlider(
+                        label = { "Brightness ${it ?: dimming}%" },
+                        value = dimming,
+                        range = (caps?.minDimming ?: MIN_DIMMING)..MAX_DIMMING,
+                        onValueChange = onBrightnessChange,
+                    )
+                }
+            }
+            val kelvinRange = caps?.kelvinRange
+            if (caps?.deviceClass?.colorTemp == true && kelvinRange != null) {
+                ControlSlider(
+                    // Without a reported temp the light is showing a colour or scene.
+                    label = { kelvin -> kelvin?.let { "Colour temperature $it K" } ?: "Colour temperature" },
+                    value = pilot.temp,
+                    range = kelvinRange.min..kelvinRange.max,
+                    step = KELVIN_STEP,
+                    onValueChange = onColorTempChange,
+                )
+            }
+            if (caps?.deviceClass?.color == true) {
+                ColorSliders(pilot.color, onColorChange)
+            }
+            val scenes = caps?.takeIf { it.effects }?.let { scenesFor(it.deviceClass) }.orEmpty()
+            if (scenes.isNotEmpty()) {
+                ScenePicker(pilot.scene, scenes, onSceneChange)
+                if (pilot.scene != null) {
+                    ControlSlider(
+                        label = { speed -> speed?.let { "Speed $it" } ?: "Speed" },
+                        value = pilot.speed,
+                        range = MIN_SPEED..MAX_SPEED,
+                        default = DEFAULT_SPEED,
+                        onValueChange = onSpeedChange,
+                    )
+                }
             }
         }
     }
 }
+
+/** Speed slider position when the device doesn't report a speed. */
+private const val DEFAULT_SPEED = 100
+
+/**
+ * Dropdown of [scenes] (scene IDs). Shows the running [current] scene's name even if it isn't
+ * selectable here, e.g. a Rhythm schedule.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ScenePicker(current: Int?, scenes: List<Int>, onSceneChange: (Int) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        OutlinedTextField(
+            value = current?.let { SCENE_NAMES[it] ?: "Scene $it" } ?: "None",
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Scene") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            scenes.forEach { id ->
+                DropdownMenuItem(
+                    text = { Text(SCENE_NAMES.getValue(id)) },
+                    onClick = { expanded = false; onSceneChange(id) },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Hue and saturation sliders. Each sends the full colour, combining its own value with the
+ * other slider's; while the light shows no colour, they start from full-saturation red.
+ */
+@Composable
+private fun ColorSliders(color: HueSat?, onColorChange: (HueSat) -> Unit) {
+    val current = color ?: HueSat(hue = 0, saturation = 100)
+    // Follows the hue thumb while dragging, so the saturation track previews the new hue.
+    var liveHue by remember(color) { mutableIntStateOf(current.hue) }
+    ControlSlider(
+        label = { hue -> hue?.let { "Hue $it°" } ?: "Hue" },
+        value = color?.hue,
+        default = current.hue,
+        range = 0..359,
+        onDrag = { liveHue = it },
+        onValueChange = { onColorChange(current.copy(hue = it)) },
+        trackBrush = HUE_BRUSH,
+    )
+    ControlSlider(
+        label = { saturation -> saturation?.let { "Saturation $it%" } ?: "Saturation" },
+        value = color?.saturation,
+        default = current.saturation,
+        range = 0..100,
+        onValueChange = { onColorChange(HueSat(liveHue, it)) },
+        trackBrush = Brush.horizontalGradient(listOf(Color.White, Color.hsv(liveHue.toFloat(), 1f, 1f))),
+    )
+}
+
+/** Full-saturation rainbow, red to red, for the hue slider's track. */
+private val HUE_BRUSH = Brush.horizontalGradient((0..360 step 60).map { Color.hsv(it.toFloat(), 1f, 1f) })
 
 /** Comma-separated list of the controls a device supports, e.g. "Brightness, colour, effects". */
 private fun featureSummary(caps: WizCapabilities): String =
@@ -154,22 +289,67 @@ private fun featureSummary(caps: WizCapabilities): String =
         .replaceFirstChar(Char::uppercase)
 
 /**
- * Tracks the drag position locally and only sends the final value, so dragging doesn't
- * flood the device with requests. Resyncs whenever the device's reported [dimming] changes.
+ * A labelled slider that tracks the drag position locally and only sends the final value, so
+ * dragging doesn't flood the device with requests. Resyncs whenever the reported [value]
+ * changes. A null [value] (unknown) parks the thumb at [default] until the user drags it.
+ *
+ * @param label text for the current position, or for null before an unknown value is dragged
+ * @param step granularity of the sent value; values are rounded to it and kept within [range]
+ * @param onDrag receives the snapped position on every drag movement, for live previews
+ * @param trackBrush paints the whole track instead of the default active/inactive colours
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun BrightnessSlider(dimming: Int, minDimming: Int, onBrightnessChange: (Int) -> Unit) {
-    var value by remember(dimming) { mutableFloatStateOf(dimming.toFloat()) }
+private fun ControlSlider(
+    label: (Int?) -> String,
+    value: Int?,
+    range: IntRange,
+    onValueChange: (Int) -> Unit,
+    step: Int = 1,
+    default: Int = (range.first + range.last) / 2,
+    onDrag: (Int) -> Unit = {},
+    trackBrush: Brush? = null,
+) {
+    val snap = { raw: Float -> ((raw / step).roundToInt() * step).coerceIn(range) }
+    var position by remember(value) { mutableFloatStateOf((value ?: default).toFloat()) }
+    var dragged by remember(value) { mutableStateOf(false) }
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text("Brightness ${value.roundToInt()}%", style = MaterialTheme.typography.bodyLarge)
-        Slider(
-            value = value,
-            onValueChange = { value = it },
-            onValueChangeFinished = { onBrightnessChange(value.roundToInt()) },
-            valueRange = minDimming.toFloat()..MAX_DIMMING.toFloat(),
-        )
+        Text(label(if (value != null || dragged) snap(position) else null), style = MaterialTheme.typography.bodyLarge)
+        val valueRange = range.first.toFloat()..range.last.toFloat()
+        val onSliderChange = { raw: Float -> position = raw; dragged = true; onDrag(snap(raw)) }
+        val onFinished = { onValueChange(snap(position)) }
+        if (trackBrush == null) {
+            Slider(
+                value = position,
+                onValueChange = onSliderChange,
+                onValueChangeFinished = onFinished,
+                valueRange = valueRange,
+            )
+        } else {
+            Slider(
+                value = position,
+                onValueChange = onSliderChange,
+                onValueChangeFinished = onFinished,
+                valueRange = valueRange,
+                track = { GradientTrack(trackBrush) },
+            )
+        }
     }
 }
+
+@Composable
+private fun GradientTrack(brush: Brush) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(16.dp)
+            .clip(CircleShape)
+            .background(brush),
+    )
+}
+
+/** Colour temperature slider granularity; finer steps aren't visibly different. */
+private const val KELVIN_STEP = 50
 
 @Composable
 private fun SectionHeader(text: String) {

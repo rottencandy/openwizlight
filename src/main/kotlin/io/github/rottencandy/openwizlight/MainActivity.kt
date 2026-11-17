@@ -49,6 +49,10 @@ class MainActivity : ComponentActivity() {
                         onBack = { selectedMac = null },
                         onPowerChange = { viewModel.setPower(selected, it) },
                         onBrightnessChange = { viewModel.setBrightness(selected, it) },
+                        onColorTempChange = { viewModel.setColorTemp(selected, it) },
+                        onColorChange = { viewModel.setColor(selected, it) },
+                        onSceneChange = { viewModel.setScene(selected, it) },
+                        onSpeedChange = { viewModel.setSpeed(selected, it) },
                     )
                 }
             }

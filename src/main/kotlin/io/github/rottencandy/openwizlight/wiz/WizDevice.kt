@@ -23,12 +23,25 @@ data class WizDevice(
  * Light state as reported by `getPilot`.
  *
  * @property dimming brightness in percent, null for devices that don't dim (e.g. sockets)
+ * @property temp white colour temperature in Kelvin, null when the light isn't in white
+ *   mode (e.g. showing an RGB colour or a scene) or doesn't support it
+ * @property color current colour, null when the light isn't showing one
+ * @property scene running scene's `sceneId` (see [SCENE_NAMES]), null when none is
+ * @property speed effect speed, [MIN_SPEED]–[MAX_SPEED], null if not reported
  */
 data class WizPilot(
     val on: Boolean,
     val dimming: Int? = null,
+    val temp: Int? = null,
+    val color: HueSat? = null,
+    val scene: Int? = null,
+    val speed: Int? = null,
 )
 
 /** Lowest brightness most lights accept; pywizlight uses the same fallback when the model doesn't report `minDimLevel`. */
 const val MIN_DIMMING = 10
 const val MAX_DIMMING = 100
+
+/** Colour temperature limits pywizlight clamps to when the device's own range is unknown. */
+const val MIN_KELVIN = 1000
+const val MAX_KELVIN = 10000

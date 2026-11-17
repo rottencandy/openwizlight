@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.rottencandy.openwizlight.wiz.HueSat
 import io.github.rottencandy.openwizlight.wiz.MIN_DIMMING
 import io.github.rottencandy.openwizlight.wiz.WizClient
 import io.github.rottencandy.openwizlight.wiz.WizDevice
@@ -121,6 +122,27 @@ class DeviceListViewModel(application: Application) : AndroidViewModel(applicati
             val minDimming = device.capabilities?.minDimming ?: MIN_DIMMING
             WizClient.setBrightness(device.ip, percent, minDimming, key)
         }
+
+    /** Only offered for devices whose Kelvin range is known, so it's always clamped to it. */
+    fun setColorTemp(device: WizDevice, kelvin: Int) {
+        val range = device.capabilities?.kelvinRange ?: return
+        control(device, { it.copy(on = true, temp = kelvin.coerceIn(range.min, range.max), color = null, scene = null) }) { key ->
+            WizClient.setColorTemp(device.ip, kelvin, range, key)
+        }
+    }
+
+    fun setColor(device: WizDevice, color: HueSat) =
+        control(device, { it.copy(on = true, color = color, temp = null, scene = null) }) { key ->
+            WizClient.setColor(device.ip, color, key)
+        }
+
+    fun setScene(device: WizDevice, sceneId: Int) =
+        control(device, { it.copy(on = true, scene = sceneId, temp = null, color = null) }) { key ->
+            WizClient.setScene(device.ip, sceneId, key)
+        }
+
+    fun setSpeed(device: WizDevice, speed: Int) =
+        control(device, { it.copy(speed = speed) }) { key -> WizClient.setSpeed(device.ip, speed, key) }
 
     private fun currentKey(): ByteArray? = _state.value.signingKey?.let(::decodeSigningKey)
 
