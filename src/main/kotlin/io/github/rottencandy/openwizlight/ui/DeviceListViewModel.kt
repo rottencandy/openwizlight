@@ -150,6 +150,18 @@ class DeviceListViewModel(application: Application) : AndroidViewModel(applicati
     fun setSpeed(device: WizDevice, speed: Int) =
         control(device, { it.copy(speed = speed) }) { key -> WizClient.setSpeed(device.ip, speed, key) }
 
+    /** Restarts the device. Push registration lapses meanwhile and is renewed by [keepRegistered]. */
+    fun reboot(device: WizDevice) {
+        viewModelScope.launch {
+            try {
+                WizClient.reboot(device.ip, currentKey())
+                _state.update { it.copy(error = null) }
+            } catch (e: IOException) {
+                _state.update { it.copy(error = controlErrorMessage(e, it.signingKey != null)) }
+            }
+        }
+    }
+
     /**
      * Keeps every listed device registered for push updates and applies the states they push,
      * until cancelled. Meant to run only while the app is visible, since registration traffic

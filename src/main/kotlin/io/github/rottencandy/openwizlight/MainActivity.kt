@@ -61,6 +61,7 @@ class MainActivity : ComponentActivity() {
                         onColorChange = { viewModel.setColor(selected, it) },
                         onSceneChange = { viewModel.setScene(selected, it) },
                         onSpeedChange = { viewModel.setSpeed(selected, it) },
+                        onReboot = { viewModel.reboot(selected) },
                     )
                 }
             }

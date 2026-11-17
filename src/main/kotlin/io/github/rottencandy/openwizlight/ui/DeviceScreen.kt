@@ -14,6 +14,10 @@ import io.github.rottencandy.openwizlight.wiz.MIN_SPEED
 import io.github.rottencandy.openwizlight.wiz.SCENE_NAMES
 import io.github.rottencandy.openwizlight.wiz.scenesFor
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -71,6 +75,7 @@ fun DeviceScreen(
     onColorChange: (HueSat) -> Unit,
     onSceneChange: (Int) -> Unit,
     onSpeedChange: (Int) -> Unit,
+    onReboot: () -> Unit,
 ) {
     var showDetails by rememberSaveable { mutableStateOf(false) }
 
@@ -110,14 +115,30 @@ fun DeviceScreen(
     }
 
     if (showDetails) {
-        DeviceDetailsSheet(device, onDismiss = { showDetails = false })
+        DeviceDetailsSheet(device, onReboot, onDismiss = { showDetails = false })
     }
 }
 
-/** Bottom sheet listing the device's identifying info and raw system config. */
+/**
+ * Bottom sheet listing the device's identifying info and raw system config, with a reboot
+ * action. Rebooting closes the sheet so any error shows on the device screen.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DeviceDetailsSheet(device: WizDevice, onDismiss: () -> Unit) {
+private fun DeviceDetailsSheet(device: WizDevice, onReboot: () -> Unit, onDismiss: () -> Unit) {
+    var confirmingReboot by rememberSaveable { mutableStateOf(false) }
+    if (confirmingReboot) {
+        AlertDialog(
+            onDismissRequest = { confirmingReboot = false },
+            icon = { Icon(Icons.Filled.RestartAlt, contentDescription = null) },
+            title = { Text("Reboot ${device.displayName()}?") },
+            text = { Text("The device will be unreachable until it reconnects to Wi-Fi.") },
+            confirmButton = {
+                TextButton(onClick = { confirmingReboot = false; onReboot(); onDismiss() }) { Text("Reboot") }
+            },
+            dismissButton = { TextButton(onClick = { confirmingReboot = false }) { Text("Cancel") } },
+        )
+    }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
             SectionHeader("Device details")
@@ -131,6 +152,13 @@ private fun DeviceDetailsSheet(device: WizDevice, onDismiss: () -> Unit) {
             }
             InfoRow("IP address", device.ip)
             InfoRow("MAC address", device.mac)
+            OutlinedButton(
+                onClick = { confirmingReboot = true },
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            ) {
+                Icon(Icons.Filled.RestartAlt, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                Text("Reboot")
+            }
             device.systemConfig
                 .filterKeys { it !in SHOWN_CONFIG_FIELDS }
                 .toSortedMap()

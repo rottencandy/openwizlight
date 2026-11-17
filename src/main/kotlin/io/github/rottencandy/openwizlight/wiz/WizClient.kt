@@ -120,6 +120,11 @@ object WizClient {
         request(ip, "setPilot", JSONObject().put("speed", speed.coerceIn(MIN_SPEED, MAX_SPEED)), signingKey)
     }
 
+    /** Restarts the device; it's unreachable until it reconnects to Wi-Fi. */
+    suspend fun reboot(ip: String, signingKey: ByteArray? = null) {
+        request(ip, "reboot", signingKey = signingKey)
+    }
+
     /**
      * Detects what the device supports, given its `getSystemConfig` reply. Queries
      * `getModelConfig`, falling back to `getUserConfig` on firmware older than 1.22.
