@@ -55,7 +55,8 @@ private const val SIGNING_KEY_FIELD = "udp_signing_key"
  * Finds the distinct, valid `udp_signing_key` values anywhere in a WiZ app export. The
  * export's layout isn't documented, so this searches every nested object and array.
  *
- * @throws org.json.JSONException if [json] isn't valid JSON
+ * @throws org.json.JSONException if [json] is malformed JSON. Android's parser is lenient,
+ *   so plain text parses as a bare string and simply yields no keys.
  */
 fun findSigningKeys(json: String): List<String> =
     signingKeyCandidates(JSONTokener(json).nextValue())

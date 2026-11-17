@@ -5,6 +5,7 @@ OpenWiZLight is an Android app that controls WiZ smart lights over the local net
 ## Build
 
 - `make build` builds the debug APK; `make run` also installs and launches it over adb.
+- `make test` runs the JVM unit tests in `src/test/kotlin`. They cover the pure `wiz/` code, with expected values taken from pywizlight's tests or computed by running pywizlight. android.jar's `org.json` is stubbed there, so tests use `com.vaadin.external.google:android-json`, a copy of Android's implementation. Its `JSONObject` doesn't keep key order, so don't assert on serialized key order.
 - When not already in the Nix dev shell, the Makefile runs commands through `nix develop`.
 - The toolchain is pinned by `flake.nix`: Gradle 8.14, Android SDK 36 and JDK 17. That limits AGP to 8.13, so library versions must support AGP 8.13 and compileSdk 36. Newer AndroidX releases may need AGP 9 and SDK 37; check `minAndroidGradlePluginVersion` and `minCompileSdk` in the AAR's metadata before upgrading.
 - There is no Gradle wrapper; the build uses the `gradle` provided by the flake.

@@ -73,7 +73,8 @@ object WizPush {
         }
     }
 
-    private fun toUpdate(json: JSONObject): PushUpdate? {
+    /** Parses a `syncPilot` message; anything else (e.g. the WiZ app's probes) yields null. */
+    internal fun toUpdate(json: JSONObject): PushUpdate? {
         if (json.optString("method") != "syncPilot") return null
         val params = json.optJSONObject("params") ?: return null
         val mac = params.optString("mac").ifEmpty { return null }

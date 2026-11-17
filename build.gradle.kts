@@ -70,4 +70,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+
+    testImplementation("junit:junit:4.13.2")
+    // android.jar's org.json is stubbed in local tests. This is a repackaged copy of Android's
+    // own (older) implementation, so parsing quirks such as leniency match the device.
+    testImplementation("com.vaadin.external.google:android-json:0.0.20131108.vaadin1")
 }

@@ -9,13 +9,16 @@ else
 	NIX := nix develop --command
 endif
 
-.PHONY: help build release install run clean
+.PHONY: help build test release install run clean
 
 help: ## Show available targets
 	@grep -E '^[a-z]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
 
 build: ## Build the debug APK
 	$(NIX) gradle assembleDebug
+
+test: ## Run the JVM unit tests
+	$(NIX) gradle testDebugUnitTest
 
 release: ## Build the shrunk release APK, signed if keystore.properties exists
 	$(NIX) gradle assembleRelease
